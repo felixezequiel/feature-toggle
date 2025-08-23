@@ -1,0 +1,48 @@
+services:
+  unleash:
+    image: unleashorg/unleash-server:main-edge
+    container_name: unleash-server
+    ports:
+      - "4242:4242"
+    environment:
+      - DATABASE_URL=postgres://unleash:unleash@postgres:5432/unleash?sslmode=disable
+      - NODE_ENV=development
+      - LOG_LEVEL=info
+      - AUTH_TYPE=none
+      - DISABLE_AUTH=false
+      - UNLEASH_BASE_URI=http://localhost:4242
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - unleash-network
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4242/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: unleash-postgres
+    environment:
+      - POSTGRES_DB=unleash
+      - POSTGRES_USER=unleash
+      - POSTGRES_PASSWORD=unleash
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - unleash-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U unleash -d unleash" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  unleash-network:
+    driver: bridge
