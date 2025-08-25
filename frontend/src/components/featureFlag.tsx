@@ -22,14 +22,14 @@ export const FeatureFlag = ({ featureName, fallback, children, variant }: Props)
                 userId: '987'
             })
             setIsEnabled(isEnabled)
-        } catch (error) {
+        } catch {
             setIsEnabled(false)
         }
     }, [featureName, variant, isEnabledFeatureFlag])
 
     useEffect(() => {
         loadFeatureFlag()
-    }, [featureName, variant, loadFeatureFlag])
+    }, [loadFeatureFlag])
 
     useEffect(() => {
         events.forEach(event => {
@@ -37,7 +37,7 @@ export const FeatureFlag = ({ featureName, fallback, children, variant }: Props)
                 setIsEnabled(Boolean(event.enabled))
             }
         })
-    }, [events])
+    }, [events, featureName])
 
     const defineFallback = () => {
         return fallback ?? null

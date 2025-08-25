@@ -1,15 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Configuração global para testes
 import '@testing-library/jest-dom';
 
-// Mock global do EventSource se não estiver disponível
+// Mock do EventSource se não estiver disponível
 if (typeof EventSource === 'undefined') {
-    (global as any).EventSource = class MockEventSource {
+    (window as any).EventSource = class MockEventSource {
         public onopen: ((event: any) => void) | null = null;
         public onmessage: ((event: any) => void) | null = null;
         public onerror: ((event: any) => void) | null = null;
         public readyState = 0;
 
-        constructor(url: string) {
+        constructor() {
             this.readyState = 1; // OPEN
             setTimeout(() => {
                 if (this.onopen) {

@@ -2,8 +2,8 @@
 
 declare global {
     namespace jest {
-        interface Matchers<R> {
-            // Adicione matchers customizados aqui se necessário
+        interface Matchers {
+            // Interface vazia para extensões futuras
         }
     }
 }

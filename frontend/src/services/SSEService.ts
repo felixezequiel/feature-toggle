@@ -1,13 +1,14 @@
-export type EventHandler<T = any> = (event: T) => void;
+export type EventHandler<T> = (event: T) => void;
 
-export interface SSEConnection {
+export interface SSEConnection<T> {
     eventSource: EventSource;
-    handlers: Set<EventHandler>;
+    handlers: Set<EventHandler<T>>;
 }
 
 export class SSEService {
     private static instance: SSEService;
-    private connections: Map<string, SSEConnection> = new Map();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private connections: Map<string, SSEConnection<any>> = new Map();
 
     private constructor() { }
 
@@ -18,7 +19,7 @@ export class SSEService {
         return SSEService.instance;
     }
 
-    public addEventHandler<T = any>(url: string, handler: EventHandler<T>): void {
+    public addEventHandler<T>(url: string, handler: EventHandler<T>): void {
         let connection = this.connections.get(url);
 
         if (!connection) {
@@ -43,7 +44,7 @@ export class SSEService {
         connection.handlers.add(handler);
     }
 
-    public removeEventHandler<T = any>(url: string, handler: EventHandler<T>): void {
+    public removeEventHandler<T>(url: string, handler: EventHandler<T>): void {
         const connection = this.connections.get(url);
 
         if (connection) {
@@ -56,7 +57,7 @@ export class SSEService {
         }
     }
 
-    private notifyHandlers<T = any>(url: string, event: T): void {
+    private notifyHandlers<T>(url: string, event: T): void {
         const connection = this.connections.get(url);
 
         if (connection) {
@@ -68,13 +69,5 @@ export class SSEService {
                 }
             });
         }
-    }
-
-    public destroy(): void {
-        this.connections.forEach((connection) => {
-            connection.eventSource.close();
-        });
-        this.connections.clear();
-        SSEService.instance = null as any;
     }
 }
