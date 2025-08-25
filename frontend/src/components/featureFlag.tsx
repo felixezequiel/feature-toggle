@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useState } from "react"
 import { useFeatureFlag } from "../hooks/useFeatureFlag"
+import { useFeatureFlagEvents } from "../hooks/useFeatureFlagEvents"
 
 type Props = {
     featureName: string
@@ -11,13 +12,14 @@ type Props = {
 export const FeatureFlag = ({ featureName, fallback, children, variant }: Props) => {
     const [isEnabled, setIsEnabled] = useState(false)
 
-    const { isEnabled: isEnabledFeatureFlag, isLoading, error } = useFeatureFlag()
+    const { isEnabled: isEnabledFeatureFlag } = useFeatureFlag()
+    const { events } = useFeatureFlagEvents()
 
     const loadFeatureFlag = useCallback(async () => {
         try {
             const isEnabled = await isEnabledFeatureFlag(featureName, variant, {
                 environment: import.meta.env.VITE_UNLEASH_ENVIRONMENT,
-                userId: '321'
+                userId: '987'
             })
             setIsEnabled(isEnabled)
         } catch (error) {
@@ -29,15 +31,15 @@ export const FeatureFlag = ({ featureName, fallback, children, variant }: Props)
         loadFeatureFlag()
     }, [featureName, variant, loadFeatureFlag])
 
+    useEffect(() => {
+        events.forEach(event => {
+            if (event.toggleName === featureName) {
+                setIsEnabled(Boolean(event.enabled))
+            }
+        })
+    }, [events])
+
     const defineFallback = () => {
-        if (isLoading) {
-            return <div>Loading...</div>
-        }
-
-        if (error) {
-            return <div>Error: {error}</div>
-        }
-
         return fallback ?? null
     }
 

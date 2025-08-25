@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { initialize, UnleashConfig } from 'unleash-client';
+import { Subject, Observable } from 'rxjs';
+import { map, startWith } from 'rxjs/operators';
 
 export interface UserContext {
   userId?: string;
@@ -9,9 +11,44 @@ export interface UserContext {
   [key: string]: any;
 }
 
+export interface UnleashToggle {
+  name: string;
+  type: string;
+  enabled: boolean;
+  project: string;
+  stale: boolean;
+  strategies: any[]; // Usar any para compatibilidade com tipos internos do Unleash
+  variants: any[];
+  description: string;
+  impressionData: boolean;
+}
+
+export interface FeatureFlagEvent {
+  type: 'feature_flag_changed' | 'feature_flags_updated';
+  toggleName?: string;
+  enabled?: boolean;
+  strategies?: any[]; // Usar any para compatibilidade
+  variants?: any[];
+  totalToggles?: number;
+  timestamp: string;
+  project?: string;
+  stale?: boolean;
+}
+
+// Tipo para o evento 'changed' do Unleash
+export type UnleashChangedEvent = UnleashToggle | UnleashToggle[];
+
+// Interface para eventos SSE no formato do NestJS
+export interface SSEEvent {
+  data: any;
+  type: string;
+  id: string;
+}
+
 @Injectable()
 export class FeatureFlagService implements OnModuleInit {
   private unleash: ReturnType<typeof initialize>;
+  private featureFlagSubject = new Subject<FeatureFlagEvent>();
 
   constructor(private configService: ConfigService) { }
 
@@ -27,8 +64,6 @@ export class FeatureFlagService implements OnModuleInit {
       disableMetrics: false
     };
 
-    console.log('🚀 Inicializando Unleash client com configurações:', unleashConfig);
-
     this.unleash = initialize(unleashConfig);
 
     // Log para debug
@@ -40,6 +75,103 @@ export class FeatureFlagService implements OnModuleInit {
     this.unleash.on('error', (err: any) => {
       console.error('❌ Erro no Unleash client:', err);
     });
+
+    // Evento para detectar mudanças em feature flags específicas
+    this.unleash.on('changed', (toggles: UnleashChangedEvent) => {
+      // Processar cada toggle alterado
+      if (Array.isArray(toggles)) {
+        toggles.forEach(toggle => {
+          if (toggle && toggle.name) {
+            this.handleFeatureFlagChange(toggle.name, toggle);
+          }
+        });
+      } else if (toggles && toggles.name) {
+        // Caso seja um único toggle
+        this.handleFeatureFlagChange(toggles.name, toggles);
+      }
+    });
+
+    // Evento para detectar atualizações gerais
+    this.unleash.on('updated', () => {
+      this.handleFeatureFlagsUpdate();
+    });
+  }
+
+  // Método para lidar com mudanças específicas
+  private handleFeatureFlagChange(toggleName: string, toggle?: UnleashToggle) {
+    const currentToggle = toggle || this.unleash.getFeatureToggleDefinition(toggleName);
+
+    if (currentToggle) {
+      // Emitir evento via SSE
+      const event: FeatureFlagEvent = {
+        type: 'feature_flag_changed',
+        toggleName,
+        enabled: currentToggle.enabled,
+        strategies: currentToggle.strategies,
+        variants: currentToggle.variants,
+        project: currentToggle.project,
+        stale: currentToggle.stale,
+        timestamp: new Date().toISOString()
+      };
+
+      this.featureFlagSubject.next(event);
+    }
+  }
+
+  // Método para lidar com atualizações gerais
+  private handleFeatureFlagsUpdate() {
+    const allToggles = this.unleash.getFeatureToggleDefinitions();
+
+    const event: FeatureFlagEvent = {
+      type: 'feature_flags_updated',
+      totalToggles: allToggles.length,
+      timestamp: new Date().toISOString()
+    };
+
+    this.featureFlagSubject.next(event);
+  }
+
+  // Método para obter stream de eventos no formato correto do NestJS
+  getFeatureFlagEvents(): Observable<SSEEvent> {
+    console.log('🔌 Cliente SSE conectado, aguardando eventos...');
+
+    // Converter os eventos para o formato SSE do NestJS
+    return this.featureFlagSubject.pipe(
+      map(event => ({
+        data: event,
+        type: 'message',
+        id: Date.now().toString()
+      })),
+      // Adicionar heartbeat para manter a conexão ativa
+      startWith({
+        data: { type: 'connected', message: 'SSE conectado', timestamp: new Date().toISOString() },
+        type: 'message',
+        id: Date.now().toString()
+      })
+    );
+  }
+
+  // Método para emitir heartbeat manual (útil para testes)
+  emitHeartbeat() {
+    const heartbeatEvent: FeatureFlagEvent = {
+      type: 'feature_flags_updated',
+      totalToggles: this.unleash ? this.unleash.getFeatureToggleDefinitions().length : 0,
+      timestamp: new Date().toISOString()
+    };
+
+    this.featureFlagSubject.next(heartbeatEvent);
+  }
+
+  // Método de teste para emitir evento manualmente
+  emitTestEvent() {
+    const testEvent: FeatureFlagEvent = {
+      type: 'feature_flag_changed',
+      toggleName: 'test-feature',
+      enabled: true,
+      timestamp: new Date().toISOString()
+    };
+
+    this.featureFlagSubject.next(testEvent);
   }
 
   isEnabled(featureName: string, context?: UserContext): boolean {

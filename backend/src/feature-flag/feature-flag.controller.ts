@@ -1,78 +1,63 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
-import { FeatureFlagService, UserContext } from './feature-flag.service';
+import { Controller, Get, Sse, MessageEvent, Query, Param, Post } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { FeatureFlagService, FeatureFlagEvent, SSEEvent } from './feature-flag.service';
 
 @Controller('feature-flags')
 export class FeatureFlagController {
-  constructor(private readonly featureFlagService: FeatureFlagService) { }
+  constructor(private featureFlagService: FeatureFlagService) { }
 
-  @Get('check/:featureName')
-  checkFeatureFlag(
-    @Param('featureName') featureName: string,
+  @Get()
+  getFeatureFlags() {
+    return this.featureFlagService.getFeatureFlags();
+  }
+
+  @Get('check/:name')
+  isEnabled(
+    @Param('name') name: string,
     @Query('userId') userId?: string,
     @Query('email') email?: string,
-    @Query('environment') environment?: string,
+    @Query('environment') environment?: string
   ) {
-    const context: UserContext = {};
+    const userContext: any = {};
+    if (userId) userContext.userId = userId;
+    if (email) userContext.email = email;
+    if (environment) userContext.environment = environment;
 
-    if (userId) context.userId = userId;
-    if (email) context.email = email;
-    if (environment) context.environment = environment;
-
-    const isEnabled = this.featureFlagService.isEnabled(featureName, context);
-    const variant = this.featureFlagService.getVariant(featureName, context);
+    const finalContext = Object.keys(userContext).length > 0 ? userContext : undefined;
 
     return {
-      featureName,
-      enabled: isEnabled, // Corrigido para 'enabled' que o frontend espera
-      variant,
-      context,
-      timestamp: new Date().toISOString(),
+      name,
+      enabled: this.featureFlagService.isEnabled(name, finalContext),
+      variant: this.featureFlagService.getVariant(name, finalContext)
     };
   }
 
-  @Get('variant/:featureName')
-  getFeatureVariant(
-    @Param('featureName') featureName: string,
-    @Query('userId') userId?: string,
-    @Query('email') email?: string,
-    @Query('environment') environment?: string,
-  ) {
-    const context: UserContext = {};
-
-    if (userId) context.userId = userId;
-    if (email) context.email = email;
-    if (environment) context.environment = environment;
-
-    const variant = this.featureFlagService.getVariant(featureName, context);
-
-    return {
-      featureName,
-      variant,
-      context,
-      timestamp: new Date().toISOString(),
-    };
+  @Sse('events')
+  featureFlagEvents(): Observable<SSEEvent> {
+    return this.featureFlagService.getFeatureFlagEvents();
   }
 
-  @Get('demo/features')
-  getDemoFeatures() {
-    // Simular algumas feature flags para demonstração
-    const demoFeatures = [
-      'dark-mode',
-      'advanced-search',
-      'analytics',
-      'notifications',
-      'experimental-features',
-    ];
+  // Endpoint de teste para emitir evento manualmente
+  @Post('test-event')
+  testEvent() {
+    this.featureFlagService.emitTestEvent();
+    return { message: 'Evento de teste emitido' };
+  }
 
-    const results = demoFeatures.map(feature => ({
-      name: feature,
-      isEnabled: this.featureFlagService.isEnabled(feature),
-      variant: this.featureFlagService.getVariant(feature),
-    }));
+  // Endpoint para emitir heartbeat manual
+  @Post('heartbeat')
+  emitHeartbeat() {
+    this.featureFlagService.emitHeartbeat();
+    return { message: 'Heartbeat emitido' };
+  }
 
+  // Endpoint para verificar status da conexão SSE
+  @Get('status')
+  getStatus() {
     return {
-      features: results,
+      status: 'active',
       timestamp: new Date().toISOString(),
+      message: 'Feature Flag Service ativo e funcionando'
     };
   }
 }

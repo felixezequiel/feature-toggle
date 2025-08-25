@@ -11,7 +11,7 @@ export const SimpleFeatureFlag = ({ featureName, fallback, children, variant }: 
     const featureEnabled = useFlag(featureName)
     const variantConfig = useVariant(featureName)
 
-    console.log({ featureEnabled, variantConfig, variant })
+    if (variantConfig.name === variant && variantConfig.enabled) return children
 
     return featureEnabled ? children : fallback
 }

@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-
 export type ContextFeatureFlag = {
   userId?: string,
   email?: string,
@@ -16,35 +14,9 @@ type ResponseFeatureFlag = {
 
 interface UseFeatureFlagType {
   isEnabled: (featureName: string, variant?: string, context?: ContextFeatureFlag) => Promise<boolean>
-  isLoading: boolean
-  error: string | null
 }
 
 export const useFeatureFlag = (): UseFeatureFlagType => {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const checkBackendConnection = async () => {
-      try {
-        // Verificar se o backend está rodando
-        const response = await fetch('http://localhost:3000/feature-flags/demo/features')
-        if (response.ok) {
-          console.log('🚀 Backend conectado com sucesso!')
-          setIsLoading(false)
-        } else {
-          throw new Error('Backend não respondeu corretamente')
-        }
-      } catch (err) {
-        console.error('Erro ao conectar com o backend:', err)
-        setError('Falha ao conectar com o backend')
-        setIsLoading(false)
-      }
-    }
-
-    checkBackendConnection()
-  }, [])
-
   const isEnabled = async (featureName: string, variant?: string, context?: ContextFeatureFlag): Promise<boolean> => {
     try {
       // Construir query string para o contexto
@@ -67,9 +39,5 @@ export const useFeatureFlag = (): UseFeatureFlagType => {
     }
   }
 
-  return {
-    isEnabled,
-    isLoading,
-    error,
-  }
+  return { isEnabled }
 }

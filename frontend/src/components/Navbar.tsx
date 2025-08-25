@@ -30,10 +30,10 @@ const Navbar = () => {
           </Link>
 
           <Link
-            to="/feature-flags"
-            className={`nav-link ${isActive('/feature-flags') ? 'active' : ''}`}
+            to="/events"
+            className={`nav-link ${isActive('/events') ? 'active' : ''}`}
           >
-            Feature Flags
+            📡 Eventos
           </Link>
         </div>
 
