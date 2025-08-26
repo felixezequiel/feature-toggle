@@ -18,18 +18,28 @@ export class FeatureFlagController {
     @Query('email') email?: string,
     @Query('environment') environment?: string
   ) {
-    const userContext: any = {};
-    if (userId) userContext.userId = userId;
-    if (email) userContext.email = email;
-    if (environment) userContext.environment = environment;
+    try {
+      const userContext: any = {};
+      if (userId) userContext.userId = userId;
+      if (email) userContext.email = email;
+      if (environment) userContext.environment = environment;
 
-    const finalContext = Object.keys(userContext).length > 0 ? userContext : undefined;
+      const finalContext = Object.keys(userContext).length > 0 ? userContext : undefined;
 
-    return {
-      name,
-      enabled: this.featureFlagService.isEnabled(name, finalContext),
-      variant: this.featureFlagService.getVariant(name, finalContext)
-    };
+      return {
+        name,
+        enabled: this.featureFlagService.isEnabled(name, finalContext),
+        variant: this.featureFlagService.getVariant(name, finalContext)
+      };
+    } catch (error) {
+      // Retornar resposta de erro estruturada em vez de deixar propagar
+      return {
+        name,
+        enabled: false,
+        variant: 'error',
+        error: 'Erro ao verificar feature flag'
+      };
+    }
   }
 
   @Sse('events')
